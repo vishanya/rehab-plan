@@ -45,6 +45,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px
 .media{display:flex;gap:8px;padding:0 12px 10px;align-items:stretch}
 .pose{flex:0 0 44%;background:#0b1220;border-radius:10px;border:1px solid var(--line);position:relative;cursor:pointer}
 .pose canvas{width:100%;height:auto;aspect-ratio:440/340;display:block}
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.hgrid label{display:flex;flex-direction:column;font-size:13px;color:var(--mut)}.hgrid input{min-width:0;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0b1220;color:#e2e8f0;font-size:16px}.ht{width:100%;font-size:13px;border-collapse:collapse;margin:6px 0}.ht td{padding:3px 4px;border-bottom:1px solid var(--line)}.hl{font-size:14px;margin:3px 0}.guide li{margin:4px 0}.guide ol ol{list-style:lower-alpha}#rdur,#rint{padding:6px;border-radius:6px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line);font-size:16px}
 .pose .pz,.pose .pzv{position:absolute;bottom:4px;background:rgba(11,18,32,.8);color:#e2e8f0;border:1px solid var(--line);border-radius:8px;font-size:13px;padding:3px 8px;min-height:28px}.pose .pz{right:4px}.pose .pzv{right:44px;font-weight:700}.pose .pzv.on{background:#0e7490}
 .pose .cap{position:absolute;left:5px;bottom:2px;font-size:13px;color:var(--acc2);font-weight:700;opacity:.8}
 .media.big{flex-direction:column}.media.big .pose{flex:1 1 auto}
@@ -407,7 +408,7 @@ function drawVar(c,name,t,still){const s3=S3[name];const PHv=(typeof PH!=="undef
 const ANIM={};const VAR=S3;
 
 
-const TABS=[["cal","Calendar"],["progress","Progress"],["start","Start here"],["pain","Pain rule"],["phases","Phases"],["physio","Physio Rx"],["mon","Mon"],["tue","Tue"],["wed","Wed rehab"],["thu","Thu"],["fri","Fri"],["sat","Sat mobility"],["daily","Daily neck"],["maint","Maintenance"],["knee","Knee tests"],["flags","Red flags"]];
+const TABS=[["cal","Calendar"],["today","Today"],["progress","Progress"],["start","Start here"],["pain","Pain rule"],["phases","Phases"],["physio","Physio Rx"],["mon","Mon"],["tue","Tue"],["wed","Wed rehab"],["thu","Thu"],["fri","Fri"],["sat","Sat mobility"],["daily","Daily neck"],["maint","Maintenance"],["knee","Knee tests"],["flags","Red flags"]];
 const LS={get(k,d){try{const v=localStorage.getItem("vr2_"+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem("vr2_"+k,JSON.stringify(v))}catch(e){}}};
 (function migrate(){try{
  if(!localStorage.getItem("vr2_mig_v1")){for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith("vr_"))continue;const nk="vr2_"+k.slice(3);
@@ -609,6 +610,202 @@ function kneeCalc(){const K=LS.get("knee",{});const inv=(K.mode||"reps")==="sec"
 function kneeSave(){const K=LS.get("knee",{});document.querySelectorAll(".knee input").forEach(i=>K[i.dataset.kk]=i.value);LS.set("knee",K);kneeCalc()}
 PAGES.flags=()=>`<h2>Red flags</h2><div class="box zone zr"><b style="color:var(--r)">Emergency now</b><ul><li>Shoulder/arm pain with chest pain, breathlessness or sweating</li><li>Hot, swollen, very painful shoulder or knee with fever or chills</li><li>A shoulder that dislocates or stays "out"</li></ul></div><div class="box zone za"><b style="color:var(--a)">See your doctor within days</b><ul><li><b>Sudden new weakness / can't lift the arm after a pull, pop or fall</b></li><li>Numbness, tingling or weakness down the arm, or neck involvement</li><li>New lump, deformity, unexplained weight loss, or history of cancer</li><li>Night pain that keeps getting worse, or pain over 24 h rising after sessions</li><li><b>Knee:</b> true locking, giving way with swelling, rapid swelling after a twist, can't bear weight or straighten</li></ul></div><div class="box zone zg"><b>Book your physio</b><ul><li>Flare not settling after ~2–3 weeks, or two red sessions in a row</li><li>No meaningful improvement after ~12 weeks</li></ul></div><p class="sub">Your physio's advice comes first. Videos are third-party demos.</p>`;
 /* router */
+/* ===== Health import (iOS Shortcut URL params) + Daily report ===== */
+const HF=[["steps","Steps",0,200000,0],["active_kcal","Active kcal",0,15000,0],["resting_kcal","Resting kcal",0,10000,0],["total_kcal","Total kcal",0,20000,0],["distance_km","Distance km",0,300,2],["exercise_min","Exercise min",0,1440,0],["azm","Active Zone Min",0,1440,0],["rhr","Resting HR",20,220,0]];
+function hNum(raw,lo,hi,dp){if(raw==null)return null;const s=String(raw).trim().replace(/,/g,"").replace(/\s/g,"");if(!/^\d+(\.\d+)?$/.test(s))return null;const v=parseFloat(s);if(!isFinite(v)||v<lo||v>hi)return null;const m=Math.pow(10,dp);return Math.round(v*m)/m}
+function hDate(s){if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const d=parseK(s);return isNaN(d)||dkey(d)!==s?null:s}
+function hSet(){return Object.assign({goal:8000,bw:100.9,int:"mod"},LS.get("hset",{}))}
+function importHealth(){let q;try{q=new URLSearchParams(location.search)}catch(e){return 0}if(![...HF.map(f=>f[0]),"date"].some(k=>q.has(k)))return 0;
+ const k=hDate(q.get("date"))||TODAYK;const vals={};HF.forEach(([f,,lo,hi,dp])=>{const v=hNum(q.get(f),lo,hi,dp);if(v!=null)vals[f]=v});
+ if(vals.total_kcal==null&&vals.active_kcal!=null&&vals.resting_kcal!=null)vals.total_kcal=Math.round(vals.active_kcal+vals.resting_kcal);
+ try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}
+ const n=Object.keys(vals).length;if(!n){setTimeout(()=>toast("Health link had no valid numbers"),300);return 0}
+ const H=LS.get("health",{});H[k]=Object.assign({},H[k]||{},vals,{src:"Shortcut",at:Date.now()});LS.set("health",H);window._rd=k;
+ setTimeout(()=>toast("Health data imported ✓ "+k),300);return n}
+function logsOn(k){const out=[];for(let i=0;i<localStorage.length;i++){const lk=localStorage.key(i);if(!lk.startsWith("vr2_log_"))continue;const ex=lk.slice(8);let L=[];try{L=JSON.parse(localStorage.getItem(lk))||[]}catch(e){}L.forEach(e=>{if(e&&e.t&&dkey(new Date(e.t))===k)out.push(Object.assign({ex},e))})}return out.sort((a,b)=>a.t-b.t)}
+function setsOf(dose){const s=String((Array.isArray(dose)?dose.find(x=>x):dose)||"");let m=s.match(/L\s*(\d+)\s*\/\s*R\s*(\d+)/);if(m)return +m[1]+ +m[2];m=s.match(/(\d+)\s*x/);return m?Math.min(+m[1],8):3}
+function restMin(r){const m=String(r||"").match(/(\d+)/);return m?+m[1]/60:1}
+const METI={light:3.5,mod:4.5,hard:5};
+function gymEst(k){const S=hSet(),d=parseK(k),dw=DOW[d.getDay()],D=LS.get("done",{}),done=!!D[k];const R=METI[S.int]||4.5;let parts=[];
+ if(done){if(dw!=="sun"){parts.push(["Physio warm-up",11,2.5]);parts.push(["Physio cool-down",7,2.5])}
+  const day=DATA.DAYS[dw];if(day){let rm=0;day.rows.forEach(r=>{if(/walk/.test(r.ex)&&!/band/.test(r.ex))parts.push(["Incline walk",20,5.5]);else rm+=setsOf(r.dose)*(.75+restMin(r.rest))});if(rm)parts.push(["Resistance training",Math.round(rm),R])}
+  if(dw==="wed"){parts.push(["Physio core Rx",25,2.5]);parts.push(["Trainer Day 3",15,3.5])}
+  if(dw==="sat")parts=[["Mobility",25,2.5]]}
+ else{const L=logsOn(k);const g={};L.forEach(e=>g[e.ex]=(g[e.ex]||0)+1);let rm=0,mob=0;for(const ex in g){if(/^p\d/.test(ex))mob+=g[ex]*1.5;else rm+=g[ex]*2}if(rm)parts.push(["Logged resistance sets",Math.round(rm),R]);if(mob)parts.push(["Logged rehab sets",Math.round(mob),2.5])}
+ const plan=parts.reduce((a,p)=>a+p[1],0);const ov=+(LS.get("dur",{})[k]||0);if(ov>0&&plan>0)parts=parts.map(p=>[p[0],p[1]*ov/plan,p[2]]);else if(ov>0)parts=[["Session",ov,R]];
+ parts=parts.map(p=>({n:p[0],min:p[1],met:p[2],kcal:p[2]*3.5*S.bw/200*p[1]}));return {parts,min:Math.round(parts.reduce((a,p)=>a+p.min,0)),kcal:Math.round(parts.reduce((a,p)=>a+p.kcal,0)),ov:ov>0,done}}
+function dayReport(k){const H=LS.get("health",{})[k]||{},S=hSet(),L=logsOn(k),F=LS.get("flare",{}),C=LS.get("crit",{});const ps=L.map(e=>+e.p).filter(v=>!isNaN(v));
+ const cr=(DATA.PHASES[PH-1]||{crit:[]}).crit;const cm=cr.filter((c,j)=>C[PH+"-"+j]).length;const st=stats();const d=parseK(k);const w=weekOf(d);
+ return {k,d,H,S,L,g:gymEst(k),pmax:ps.length?Math.max(...ps):null,pavg:ps.length?Math.round(10*ps.reduce((a,b)=>a+b,0)/ps.length)/10:null,flare:!!F[k],ph:PH,crit:[cm,cr.length],streak:st.streak,w,title:d.toLocaleDateString("en-CA",{weekday:"long",month:"long",day:"numeric",year:"numeric"}),session:sessName(k)}}
+function sessName(k){const d=parseK(k),dw=DOW[d.getDay()];if(DATA.DAYS[dw])return DATA.DAYS[dw].title;return {wed:"Rehab day: Physio Rx + Trainer Day 3",sat:"Optional mobility",sun:"Rest day"}[dw]}
+const fmt=v=>v==null?"—":Math.round(v).toLocaleString("en-CA");
+function painCol(p){return ({g:"#22c55e",a:"#f59e0b",r:"#ef4444"})[zone(p)]||"#94a3b8"}
+PAGES.today=()=>{const k=window._rd||TODAYK;const R=dayReport(k),H=R.H,S=R.S;const exn=e=>esc((DATA.EX[e]||{name:e}).name);
+ const g=R.g;let h=`<h2>Daily report</h2><div class="row"><input type="date" id="rdate" value="${k}" style="padding:8px;border-radius:8px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line)"><button class="btn sec" data-hact="tod">Today</button>${fbTok()?`<button class="btn" data-fb="sync">⌚ Sync Fitbit</button>`:`<a class="btn" href="#fitbit">⌚ Connect Fitbit</a>`}<a class="btn sec" href="#connect">🍎 Apple Health</a></div>
+ <p class="sub">${esc(R.title)} · ${esc(R.session||"")} · Week ${R.w}</p>
+ <div class="box"><div class="row" style="align-items:center;gap:14px"><canvas id="ring" width="240" height="240" style="width:120px;height:120px"></canvas><div><div style="font-size:28px;font-weight:800">${fmt(H.steps)}</div><div class="sub">steps · goal ${fmt(S.goal)}${H.distance_km!=null?` · ${H.distance_km} km`:""}${H.azm!=null?` · ${H.azm} Active Zone Min`:""}${H.rhr!=null?` · RHR ${H.rhr}`:""}</div>
+ <div style="margin-top:6px"><b style="font-size:20px">${fmt(H.active_kcal)}</b> <span class="sub">${H.src==="Fitbit"?"Fitbit":"Health"} active kcal</span></div><div><b>${fmt(H.total_kcal)}</b> <span class="sub">total kcal${H.resting_kcal!=null?` (resting ${fmt(H.resting_kcal)})`:""}</span></div>
+ <div class="sub" style="margin-top:4px">${H.src?`From ${esc(H.src)} · ${new Date(H.at).toLocaleTimeString("en-CA",{hour:"numeric",minute:"2-digit"})}`:"No Fitbit/Health data for this day yet"}</div></div></div>${(H.acts||[]).length?`<div class="sub" style="margin-top:6px">Fitbit activities: ${H.acts.map(a=>esc(a.n)+" "+a.min+" min · "+fmt(a.kcal)+" kcal").join("; ")}</div>`:""}
+ <details ${H.src?"":"open"}><summary>Enter or edit manually</summary><div class="hgrid">${HF.map(([f,l])=>`<label>${l}<input inputmode="decimal" data-hf="${f}" value="${H[f]!=null?H[f]:""}"></label>`).join("")}</div><button class="btn" data-hact="hsave">Save</button> <button class="btn sec" data-hact="hclr">Clear day</button></details></div>
+ <div class="box"><b>Gym estimate · ${fmt(g.kcal)} kcal</b> <span class="sub">(≈${g.min} min${g.ov?", your duration":", estimated from plan sets + rest"})</span>
+ <p class="sub" style="margin:6px 0">⚠️ Estimate only (MET × 3.5 × ${S.bw} kg ÷ 200 × minutes). Fitbit/Apple Health active kcal already includes this workout if you wore your watch/phone, so <b>don't add the two</b>; the tracker figure is the main one.</p>
+ ${g.parts.length?`<table class="ht">${g.parts.map(p=>`<tr><td>${esc(p.n)}</td><td>${Math.round(p.min)} min</td><td>MET ${p.met}</td><td>${Math.round(p.kcal)} kcal</td></tr>`).join("")}</table>`:`<p class="sub">No session ticked or sets logged for this day.</p>`}
+ <div class="row"><label class="sub">Actual duration (min) <input id="rdur" inputmode="numeric" style="width:70px" value="${LS.get("dur",{})[k]||""}"></label><label class="sub">Intensity <select id="rint">${["light","mod","hard"].map(x=>`<option value="${x}" ${S.int===x?"selected":""}>${{light:"Light (MET 3.5)",mod:"Moderate (MET 4.5)",hard:"Hard (MET 5)"}[x]}</option>`).join("")}</select></label></div></div>
+ <div class="box"><b>Workout</b><p>${g.done?"✅ Session ticked done":"⬜ Session not ticked"} · ${R.flare?"🔥 Flare day":"No flare"}</p>
+ ${R.L.length?R.L.map(e=>`<div class="hl"><span class="dot" style="background:${painCol(e.p)}"></span>${exn(e.ex)} · ${e.w!==""?esc(e.w)+" kg":"—"} × ${e.r!==""?esc(e.r):"—"} · pain ${e.p}/10</div>`).join(""):`<p class="sub">No sets logged this day.</p>`}
+ <p>Shoulder pain: max <b>${R.pmax==null?"—":R.pmax+"/10"}</b> · avg <b>${R.pavg==null?"—":R.pavg+"/10"}</b></p>
+ <p>Phase <b>${R.ph}</b> · criteria ${R.crit[0]}/${R.crit[1]} · streak <b>${R.streak}</b> days (Mon–Fri)</p></div>
+ <div class="box"><b>Last 7 days</b><canvas id="trend" width="700" height="300" style="width:100%;height:auto"></canvas></div>
+ <div class="row"><button class="btn" data-hact="share">📤 Share report</button><button class="btn sec" data-hact="copy">📋 Copy as text</button></div>
+ <div class="box"><b>Settings</b><div class="hgrid"><label>Daily step goal<input id="sgoal" inputmode="numeric" value="${S.goal}"></label><label>Body weight (kg)<input id="sbw" inputmode="decimal" value="${S.bw}"></label></div></div>`;
+ setTimeout(()=>{drawRing(document.getElementById("ring"),H.steps,S.goal);drawTrend(document.getElementById("trend"),k)},0);return h};
+function drawRing(cv,v,goal){if(!cv)return;const c=cv.getContext("2d"),f=Math.min(1,(v||0)/goal);c.clearRect(0,0,240,240);c.lineWidth=26;c.lineCap="round";c.strokeStyle="#1e293b";c.beginPath();c.arc(120,120,95,0,7);c.stroke();c.strokeStyle=f>=1?"#22c55e":"#38bdf8";if(f>0){c.beginPath();c.arc(120,120,95,-Math.PI/2,-Math.PI/2+f*Math.PI*2);c.stroke()}txt(c,Math.round(f*100)+"%",120,134,"#e2e8f0",42)}
+function drawTrend(cv,k){if(!cv)return;const c=cv.getContext("2d"),W=cv.width,Hh=cv.height,Hd=LS.get("health",{});c.clearRect(0,0,W,Hh);const days=[];for(let i=6;i>=0;i--){const d=addD(parseK(k),-i),dk=dkey(d);const h=Hd[dk]||{};days.push({d,s:h.steps,a:h.active_kcal,g:gymEst(dk).kcal})}
+ const ms=Math.max(1000,...days.map(x=>x.s||0)),mk=Math.max(200,...days.map(x=>Math.max(x.a||0,x.g||0)));const x0=50,x1=W-50,y0=Hh-40,y1=30,bw=(x1-x0)/7;
+ c.strokeStyle="#334155";c.lineWidth=1;[0,.5,1].forEach(f=>{const y=y0-(y0-y1)*f;c.beginPath();c.moveTo(x0,y);c.lineTo(x1,y);c.stroke()});
+ days.forEach((x,i)=>{const cx=x0+bw*i+bw/2;if(x.s){const hh=(y0-y1)*x.s/ms;c.fillStyle="#0ea5e9";c.globalAlpha=.75;c.fillRect(cx-bw*.3,y0-hh,bw*.6,hh);c.globalAlpha=1}txt(c,x.d.toLocaleDateString("en-CA",{weekday:"short"}),cx,y0+22,"#94a3b8",16)});
+ [["a","#f97316"],["g","#a78bfa"]].forEach(([f,col])=>{c.strokeStyle=col;c.lineWidth=4;c.beginPath();let st=0;days.forEach((x,i)=>{if(!x[f])return;const cx=x0+bw*i+bw/2,y=y0-(y0-y1)*x[f]/mk;st++?c.lineTo(cx,y):c.moveTo(cx,y)});c.stroke();days.forEach((x,i)=>{if(x[f])circ(c,[x0+bw*i+bw/2,y0-(y0-y1)*x[f]/mk],6,col,1)})});
+ txt(c,"■ steps (max "+fmt(ms)+")",x0,20,"#0ea5e9",16,"left");txt(c,"● tracker active kcal",x0+250,20,"#f97316",16,"left");txt(c,"● gym est.",x0+460,20,"#a78bfa",16,"left");txt(c,fmt(mk)+" kcal",x1+45,y1+6,"#94a3b8",13,"right")}
+function reportText(k){const R=dayReport(k),H=R.H,g=R.g;const exn=e=>(DATA.EX[e]||{name:e}).name;let t=`Daily report · ${R.title}\n${R.session||""} · Week ${R.w} · Phase ${R.ph}\n\nSteps: ${fmt(H.steps)} / goal ${fmt(R.S.goal)}${H.distance_km!=null?` · ${H.distance_km} km`:""}\n${H.src||'Tracker'} active kcal: ${fmt(H.active_kcal)}${H.azm!=null?` · AZM ${H.azm}`:''}${H.rhr!=null?` · resting HR ${H.rhr}`:''}${(H.acts||[]).length?`\nFitbit activities: ${H.acts.map(a=>a.n+' '+a.min+' min').join(', ')}`:''}\nTotal kcal: ${fmt(H.total_kcal)}${H.resting_kcal!=null?` (resting ${fmt(H.resting_kcal)})`:""}\nGym estimate: ~${fmt(g.kcal)} kcal over ~${g.min} min (MET estimate; already included in tracker active kcal, so don't add them)\n\nSession: ${g.done?"done ✓":"not ticked"}${R.flare?" · FLARE DAY":""}\n`;
+ if(R.L.length)t+="Sets:\n"+R.L.map(e=>`- ${exn(e.ex)}: ${e.w!==""?e.w+" kg":"-"} x ${e.r!==""?e.r:"-"}, pain ${e.p}/10 (${({g:"green",a:"amber",r:"red"})[zone(e.p)]||zone(e.p)})`).join("\n")+"\n";
+ t+=`Shoulder pain: max ${R.pmax==null?"-":R.pmax+"/10"}, avg ${R.pavg==null?"-":R.pavg+"/10"}\nPhase ${R.ph} criteria: ${R.crit[0]}/${R.crit[1]} · Streak: ${R.streak} days`;return t}
+function reportPNG(k){const R=dayReport(k),H=R.H,g=R.g;const rows=R.L.slice(0,14);const W=1080,Ht=1400+rows.length*52+(R.L.length>14?52:0);const cv=document.createElement("canvas");cv.width=W;cv.height=Ht;const c=cv.getContext("2d");
+ const gr=c.createLinearGradient(0,0,0,Ht);gr.addColorStop(0,"#0f1a2e");gr.addColorStop(1,"#0b1220");c.fillStyle=gr;c.fillRect(0,0,W,Ht);
+ txt(c,"Shoulder & Knee Plan · Daily report",60,80,"#38bdf8",34,"left");txt(c,R.title,60,135,"#e2e8f0",44,"left");txt(c,(R.session||"")+" · Week "+R.w+" · Phase "+R.ph,60,185,"#94a3b8",28,"left");
+ const rc=document.createElement("canvas");rc.width=240;rc.height=240;drawRing(rc,H.steps,R.S.goal);c.drawImage(rc,60,220,260,260);
+ txt(c,fmt(H.steps),360,300,"#e2e8f0",72,"left");txt(c,"steps · goal "+fmt(R.S.goal)+(H.distance_km!=null?" · "+H.distance_km+" km":""),360,345,"#94a3b8",28,"left");
+ txt(c,fmt(H.active_kcal)+" kcal",360,420,"#f97316",48,"left");txt(c,(H.src||"Tracker")+" active · total "+fmt(H.total_kcal),360,460,"#94a3b8",28,"left");
+ c.fillStyle="#1e1b4b";rrect(c,60,510,W-120,150,18);c.fill();txt(c,"Gym estimate ≈ "+fmt(g.kcal)+" kcal · "+g.min+" min",90,570,"#c4b5fd",36,"left");txt(c,"MET estimate; already inside tracker active kcal, don't add",90,620,"#a5b4fc",26,"left");
+ let y=720;txt(c,(g.done?"✅ Session done":"⬜ Session not ticked")+(R.flare?"  ·  🔥 Flare day":""),60,y,"#e2e8f0",34,"left");y+=60;
+ txt(c,"Shoulder pain  max "+(R.pmax==null?"—":R.pmax+"/10")+"  ·  avg "+(R.pavg==null?"—":R.pavg+"/10"),60,y,"#e2e8f0",30,"left");y+=50;
+ txt(c,"Phase "+R.ph+" criteria "+R.crit[0]+"/"+R.crit[1]+"  ·  streak "+R.streak+" days",60,y,"#e2e8f0",30,"left");y+=70;
+ txt(c,R.L.length?"Logged sets":"No sets logged",60,y,"#38bdf8",32,"left");y+=50;
+ rows.forEach(e=>{circ(c,[75,y-10],12,painCol(e.p),1);txt(c,(DATA.EX[e.ex]||{name:e.ex}).name.slice(0,40),100,y,"#e2e8f0",28,"left");txt(c,(e.w!==""?e.w+" kg":"—")+" × "+(e.r!==""?e.r:"—")+" · "+e.p+"/10",W-60,y,"#cbd5e1",28,"right");y+=52});
+ if(R.L.length>14){txt(c,"+"+(R.L.length-14)+" more",100,y,"#94a3b8",26,"left");y+=52}
+ const tc=document.createElement("canvas");tc.width=700;tc.height=300;drawTrend(tc,k);c.drawImage(tc,60,y+10,W-120,(W-120)*300/700);y+=10+(W-120)*300/700;
+ txt(c,"Tracker data: "+(H.src||"none")+" · gym kcal is an estimate",W/2,Ht-30,"#64748b",22);return cv}
+async function shareReport(k){const cv=reportPNG(k);const name="rehab-report-"+k+".png";const blob=await new Promise(r=>cv.toBlob(r,"image/png"));try{const f=new File([blob],name,{type:"image/png"});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Daily report "+k,text:reportText(k).split("\n")[0]});return}}catch(e){if(e&&e.name==="AbortError")return}
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast("Report PNG downloaded")}
+async function copyText(s){try{await navigator.clipboard.writeText(s);toast("Copied ✓");return}catch(e){}const ta=document.createElement("textarea");ta.value=s;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("Copied ✓")}catch(e){toast("Copy failed")}ta.remove()}
+document.addEventListener("click",ev=>{const b=ev.target.closest("[data-hact]");if(!b)return;const a=b.dataset.hact,k=window._rd||TODAYK;
+ if(a==="tod"){window._rd=TODAYK;route()}
+ if(a==="hsave"){const H=LS.get("health",{});const o={};let bad=0;document.querySelectorAll("[data-hf]").forEach(i=>{const f=HF.find(x=>x[0]===i.dataset.hf);if(i.value.trim()==="")return;const v=hNum(i.value,f[2],f[3],f[4]);if(v==null)bad++;else o[f[0]]=v});if(o.total_kcal==null&&o.active_kcal!=null&&o.resting_kcal!=null)o.total_kcal=Math.round(o.active_kcal+o.resting_kcal);H[k]=Object.assign(o,{src:"manual entry",at:Date.now()});LS.set("health",H);toast(bad?`Saved (${bad} invalid ignored)`:"Saved ✓");route()}
+ if(a==="hclr"){const H=LS.get("health",{});delete H[k];LS.set("health",H);route()}
+ if(a==="share")shareReport(k);if(a==="copy")copyText(reportText(k))});
+document.addEventListener("change",ev=>{const t=ev.target;if(t.id==="rdate"&&hDate(t.value)){window._rd=t.value;route()}
+ if(t.id==="rdur"){const D=LS.get("dur",{}),k=window._rd||TODAYK,v=hNum(t.value,1,600,0);if(v)D[k]=v;else delete D[k];LS.set("dur",D);route()}
+ if(t.id==="rint"||t.id==="sgoal"||t.id==="sbw"){const S=LS.get("hset",{});if(t.id==="rint")S.int=t.value;if(t.id==="sgoal"){const v=hNum(t.value,500,100000,0);if(v)S.goal=v}if(t.id==="sbw"){const v=hNum(t.value,30,300,1);if(v)S.bw=v}LS.set("hset",S);route()}});
+PAGES.connect=()=>`<p><a href="#today" style="color:var(--acc2)">‹ Daily report</a></p><div class='box guide'><h2>Connect Apple Health to the rehab app (iOS Shortcut)</h2>
+<p>Apple Health has no web API, so a Shortcut reads today's totals on your iPhone and opens the app with them in the link. Nothing is uploaded anywhere. The numbers go straight into the app on this phone and are saved only on this device.</p>
+<h3>Build the shortcut (about 5 minutes)</h3>
+<ol>
+<li>Open the <b>Shortcuts</b> app. Go to the <b>Shortcuts</b> tab, tap <b>+</b>, and name the shortcut <b>Rehab Health</b>.</li>
+<li><b>Steps</b></li>
+<ol>
+<li>Add the action <b>Find Health Samples</b>. Set:</li>
+<ul>
+<li><b>Type</b> = <b>Steps</b></li>
+<li><b>Start Date</b> <b>is today</b></li>
+<li><b>Group By</b> = <b>Day</b></li>
+<li><b>Unit</b> = <b>count</b></li>
+</ul>
+<li>Add <b>Calculate Statistics</b> and set <b>Operation</b> = <b>Sum</b>.</li>
+<li>Add <b>Round Number</b> (Ones Place). Long-press its output, choose <b>Rename</b>, and call it <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Steps</code>.</li>
+</ol>
+<li><b>Active energy</b></li>
+<ol>
+<li>Add another <b>Find Health Samples</b>. Set:</li>
+<ul>
+<li><b>Type</b> = <b>Active Energy</b></li>
+<li><b>Start Date</b> <b>is today</b></li>
+<li><b>Group By</b> = <b>Day</b></li>
+<li><b>Unit</b> = <b>kcal</b></li>
+</ul>
+<li>Add <b>Calculate Statistics</b> (<b>Sum</b>), then <b>Round Number</b>. Rename the output <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Active</code>.</li>
+</ol>
+<li><b>Resting energy</b>: repeat step 3 with <b>Type</b> = <b>Resting Energy</b>. Rename the output <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Resting</code>.</li>
+<li><b>Optional extras</b>, built the same way:</li>
+<ul>
+<li><b>Walking + Running Distance</b> (unit <b>km</b>) → <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Distance</code></li>
+<li><b>Exercise Minutes</b> (from the <b>Exercise Time</b> type, unit <b>min</b>) → <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>ExMin</code></li>
+</ul>
+<li>Add <b>Calculate</b>, set to <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Active</code> <b>+</b> <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Resting</code>, then <b>Round Number</b>. Rename the output <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Total</code>.</li>
+<li>Add <b>Format Date</b>. Set:</li>
+<ul>
+<li>Date = <b>Current Date</b></li>
+<li>Date Format = <b>Custom</b></li>
+<li>Format String = <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>yyyy-MM-dd</code></li>
+<li>Rename the output <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>Day</code>.</li>
+</ul>
+<li>Add a <b>URL</b> action and type the link, inserting each variable from the bar above the keyboard:</li>
+<div><code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>https://vishanya.github.io/rehab-plan/?steps=[Steps]&amp;active_kcal=[Active]&amp;resting_kcal=[Resting]&amp;total_kcal=[Total]&amp;date=[Day]</code></div>
+<div>If you built step 5, you can also add <code style='word-break:break-all;background:#0b1220;padding:1px 4px;border-radius:4px'>&amp;distance_km=[Distance]&amp;exercise_min=[ExMin]</code>.</div>
+<li>Add <b>Open URLs</b> (input: the URL).</li>
+<li>Tap <b>Done</b>, then run the shortcut once. Allow Health access when iOS asks, and choose <b>Always Allow</b> on the "share samples" prompt. The app opens and shows <b>"Health data imported"</b>.</li>
+</ol>
+<h3>Add it to your Home Screen</h3>
+<p>Long-press the shortcut, then <b>Share → Add to Home Screen</b>. Pick an icon, then tap <b>Add</b>. One tap now imports today's numbers.</p>
+<h3>Optional: make it run automatically</h3>
+<p><b>Automation</b> tab → <b>+</b> (or <b>New Automation</b>) → choose a trigger:</p>
+<ul>
+<li><b>Time of Day</b>: for example 9:00 PM, Daily.</li>
+<li><b>Leave</b>: choose your gym's location. It runs when you leave the gym.</li>
+</ul>
+<p>Then pick <b>Run Immediately</b> (turn off <b>Notify When Run</b> if you like) and choose the <b>Rehab Health</b> shortcut. The phone must be unlocked for it to open the app; otherwise you get a notification to tap.</p>
+<h3>Tips</h3>
+<ul>
+<li>If the step count looks higher than in the Health app, it's because the iPhone and Apple Watch both record steps. Make sure <b>Group By = Day</b> is set; if it's still high, add a filter <b>Source is [your Apple Watch]</b>.</li>
+<li>Health active kcal already includes your gym workout if you wore your watch or phone. The app's <b>Gym estimate</b> is a separate MET-based estimate; <b>don't add the two together</b>.</li>
+<li>No Shortcut handy? Use <b>Today → Enter or edit manually</b> in the app.</li>
+<li>Re-running the shortcut on the same day just updates that day's numbers.</li>
+</ul></div>`;
+importHealth();
+/* ===== Fitbit Web API (OAuth2 Auth Code + PKCE, client-side) ===== */
+const FITBIT_CLIENT_ID="";/* set after registering at dev.fitbit.com (type: Client) — or paste it in the app's Fitbit settings */
+const FB_SCOPES="activity heartrate profile";const FB_API="https://api.fitbit.com";
+function fbCid(){return (LS.get("fb_cid","")||FITBIT_CLIENT_ID||"").trim()}
+function fbRedirect(){return location.origin+location.pathname}
+function fbTok(){return LS.get("fb_tok",null)}
+function b64u(buf){let s="";new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return b64u(a)}
+async function fbConnect(){const cid=fbCid();if(!cid){toast("Add your Fitbit Client ID in settings first");location.hash="#fitbit";return}
+ const ver=rnd(48),st=rnd(16);const ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(ver)));
+ sessionStorage.setItem("fb_pkce",JSON.stringify({ver,st}));localStorage.setItem("vr2_fb_pkce",JSON.stringify({ver,st}));
+ location.href="https://www.fitbit.com/oauth2/authorize?"+new URLSearchParams({response_type:"code",client_id:cid,scope:FB_SCOPES,code_challenge:ch,code_challenge_method:"S256",redirect_uri:fbRedirect(),state:st})}
+async function fbTokenReq(p){const r=await fetch(FB_API+"/oauth2/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(Object.assign({client_id:fbCid()},p))});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error((j.errors&&j.errors[0]&&j.errors[0].message)||("token HTTP "+r.status));
+ const t={at:j.access_token,rt:j.refresh_token,exp:Date.now()+(j.expires_in||28800)*1000-60000,uid:j.user_id,scope:j.scope};LS.set("fb_tok",t);return t}
+async function fbCallback(){let q;try{q=new URLSearchParams(location.search)}catch(e){return}if(!q.has("code")&&!q.has("error"))return;
+ const pk=JSON.parse(sessionStorage.getItem("fb_pkce")||localStorage.getItem("vr2_fb_pkce")||"null");try{history.replaceState(null,"",location.pathname+"#today")}catch(e){}
+ if(q.has("error")){toast("Fitbit: "+q.get("error"));return}
+ if(!pk||pk.st!==q.get("state")){toast("Fitbit sign-in failed (state mismatch) – try again");return}
+ try{await fbTokenReq({grant_type:"authorization_code",code:q.get("code"),code_verifier:pk.ver,redirect_uri:fbRedirect()});localStorage.removeItem("vr2_fb_pkce");sessionStorage.removeItem("fb_pkce");toast("Fitbit connected ✓");await fbSync(TODAYK);await fbSyncRange(TODAYK,6,true);route()}catch(e){toast("Fitbit: "+e.message)}}
+async function fbGet(path){let t=fbTok();if(!t)throw new Error("not connected");
+ if(Date.now()>t.exp)t=await fbTokenReq({grant_type:"refresh_token",refresh_token:t.rt});
+ let r=await fetch(FB_API+path,{headers:{Authorization:"Bearer "+t.at,"Accept-Language":"en_CA"}});
+ if(r.status===401){t=await fbTokenReq({grant_type:"refresh_token",refresh_token:t.rt});r=await fetch(FB_API+path,{headers:{Authorization:"Bearer "+t.at,"Accept-Language":"en_CA"}})}
+ if(r.status===429)throw new Error("Fitbit rate limit – try again in an hour");if(!r.ok)throw new Error("Fitbit HTTP "+r.status);return r.json()}
+async function fbSync(k,quiet){const s=await fbGet(`/1/user/-/activities/date/${k}.json`);const S=s.summary||{};
+ let azm=null;try{const a=await fbGet(`/1/user/-/activities/active-zone-minutes/date/${k}/1d.json`);const v=(a["activities-active-zone-minutes"]||[])[0];azm=v?v.value.activeZoneMinutes:0}catch(e){}
+ const dist=(S.distances||[]).find(d=>d.activity==="total");
+ const vals={steps:S.steps,total_kcal:S.caloriesOut,active_kcal:S.activityCalories,resting_kcal:S.caloriesBMR,distance_km:dist?Math.round(dist.distance*100)/100:null,azm,rhr:S.restingHeartRate!=null?S.restingHeartRate:null,
+  exercise_min:(S.fairlyActiveMinutes||0)+(S.veryActiveMinutes||0),
+  acts:(s.activities||[]).map(a=>({n:a.name||a.activityName,min:Math.round((a.duration||0)/60000),kcal:a.calories,st:a.startTime}))};
+ Object.keys(vals).forEach(x=>vals[x]==null&&delete vals[x]);
+ const H=LS.get("health",{});H[k]=Object.assign({},H[k]||{},vals,{src:"Fitbit",at:Date.now()});LS.set("health",H);if(!quiet)toast("Fitbit synced ✓ "+k);return vals}
+async function fbSyncRange(k,n,quiet){for(let i=1;i<=n;i++){const dk=dkey(addD(parseK(k),-i));try{await fbSync(dk,true)}catch(e){if(/rate/.test(e.message))break}}if(!quiet)toast("Fitbit: synced 7 days ✓")}
+function fbDisconnect(){const t=fbTok();if(t)fetch(FB_API+"/oauth2/revoke",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:fbCid(),token:t.rt||t.at})}).catch(()=>{});localStorage.removeItem("vr2_fb_tok");toast("Fitbit disconnected");route()}
+PAGES.fitbit=()=>{const t=fbTok();return `<p><a href="#today" style="color:var(--acc2)">‹ Daily report</a></p><h2>⌚ Fitbit (Charge 6)</h2>
+ <div class="box"><b>Status:</b> ${t?`✅ Connected${t.uid?" (user "+esc(t.uid)+")":""}`:"Not connected"}<p class="sub">Pulls steps, total/active/BMR calories, Active Zone Minutes, resting heart rate, distance and logged exercises for any day. Tokens stay only on this phone.</p>
+ <div class="row">${t?`<button class="btn" data-fb="sync">Sync today</button><button class="btn sec" data-fb="sync7">Sync last 7 days</button><button class="btn sec" data-fb="off">Disconnect</button>`:`<button class="btn" data-fb="conn">Connect Fitbit</button>`}</div></div>
+ <div class="box"><b>Fitbit Client ID</b><p class="sub">From dev.fitbit.com → Manage → your app (OAuth 2.0 Client ID, 6 characters). Redirect URL must be exactly <code>${esc(fbRedirect())}</code></p>
+ <div class="row"><input id="fbcid" value="${esc(fbCid())}" placeholder="e.g. 23ABCD" style="padding:8px;border-radius:8px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line)"><button class="btn sec" data-fb="savecid">Save</button></div></div>
+ <div class="box sub">Sync your Charge 6 to the Fitbit phone app first, then press Sync here. No Fitbit? Use manual entry or the Apple Health Shortcut on the Daily report.</div>`};
+document.addEventListener("click",async ev=>{const b=ev.target.closest("[data-fb]");if(!b)return;const a=b.dataset.fb,k=window._rd||TODAYK;
+ try{if(a==="conn")await fbConnect();if(a==="off")fbDisconnect();if(a==="savecid"){LS.set("fb_cid",document.getElementById("fbcid").value.trim());toast("Client ID saved");route()}
+ if(a==="sync"){b.disabled=true;await fbSync(k);route()}if(a==="sync7"){b.disabled=true;await fbSync(k,true);await fbSyncRange(k,6);route()}}catch(e){toast("Fitbit: "+e.message);b.disabled=false}});
+fbCallback();
+
+
 function route(){let h=(location.hash||"").slice(1);let k=h.split("/")[0];CARD=0;
  if(k==="d"&&h.split("/")[1]){renderNav("cal");document.getElementById("main").innerHTML=datePage(h.split("/")[1]);setupAnims();return}
  if(!PAGES[k])k=LS.get("tab",null)||"cal";if(!PAGES[k])k="cal";LS.set("tab",k);renderNav(k);
