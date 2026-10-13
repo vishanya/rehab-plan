@@ -760,49 +760,60 @@ PAGES.connect=()=>`<p><a href="#today" style="color:var(--acc2)">‹ Daily repor
 <li>Re-running the shortcut on the same day just updates that day's numbers.</li>
 </ul></div>`;
 importHealth();
-/* ===== Fitbit Web API (OAuth2 Auth Code + PKCE, client-side) ===== */
-const FITBIT_CLIENT_ID="";/* set after registering at dev.fitbit.com (type: Client) — or paste it in the app's Fitbit settings */
-const FB_SCOPES="activity heartrate profile";const FB_API="https://api.fitbit.com";
-function fbCid(){return (LS.get("fb_cid","")||FITBIT_CLIENT_ID||"").trim()}
+/* ===== Fitbit Charge 6 via Google Health API (Google OAuth 2.0, client-side token flow) ===== */
+const GH_CLIENT_ID="";/* Google Cloud OAuth "Web application" client ID (…apps.googleusercontent.com) — or paste it in the app's Fitbit settings */
+const GH_SCOPES="https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly";
+const GH_API="https://health.googleapis.com/v4/users/me/dataTypes/";
+function fbCid(){return (LS.get("gh_cid","")||GH_CLIENT_ID||"").trim()}
 function fbRedirect(){return location.origin+location.pathname}
-function fbTok(){return LS.get("fb_tok",null)}
-function b64u(buf){let s="";new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
-function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return b64u(a)}
-async function fbConnect(){const cid=fbCid();if(!cid){toast("Add your Fitbit Client ID in settings first");location.hash="#fitbit";return}
- const ver=rnd(48),st=rnd(16);const ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(ver)));
- sessionStorage.setItem("fb_pkce",JSON.stringify({ver,st}));localStorage.setItem("vr2_fb_pkce",JSON.stringify({ver,st}));
- location.href="https://www.fitbit.com/oauth2/authorize?"+new URLSearchParams({response_type:"code",client_id:cid,scope:FB_SCOPES,code_challenge:ch,code_challenge_method:"S256",redirect_uri:fbRedirect(),state:st})}
-async function fbTokenReq(p){const r=await fetch(FB_API+"/oauth2/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(Object.assign({client_id:fbCid()},p))});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error((j.errors&&j.errors[0]&&j.errors[0].message)||("token HTTP "+r.status));
- const t={at:j.access_token,rt:j.refresh_token,exp:Date.now()+(j.expires_in||28800)*1000-60000,uid:j.user_id,scope:j.scope};LS.set("fb_tok",t);return t}
-async function fbCallback(){let q;try{q=new URLSearchParams(location.search)}catch(e){return}if(!q.has("code")&&!q.has("error"))return;
- const pk=JSON.parse(sessionStorage.getItem("fb_pkce")||localStorage.getItem("vr2_fb_pkce")||"null");try{history.replaceState(null,"",location.pathname+"#today")}catch(e){}
- if(q.has("error")){toast("Fitbit: "+q.get("error"));return}
- if(!pk||pk.st!==q.get("state")){toast("Fitbit sign-in failed (state mismatch) – try again");return}
- try{await fbTokenReq({grant_type:"authorization_code",code:q.get("code"),code_verifier:pk.ver,redirect_uri:fbRedirect()});localStorage.removeItem("vr2_fb_pkce");sessionStorage.removeItem("fb_pkce");toast("Fitbit connected ✓");await fbSync(TODAYK);await fbSyncRange(TODAYK,6,true);route()}catch(e){toast("Fitbit: "+e.message)}}
-async function fbGet(path){let t=fbTok();if(!t)throw new Error("not connected");
- if(Date.now()>t.exp)t=await fbTokenReq({grant_type:"refresh_token",refresh_token:t.rt});
- let r=await fetch(FB_API+path,{headers:{Authorization:"Bearer "+t.at,"Accept-Language":"en_CA"}});
- if(r.status===401){t=await fbTokenReq({grant_type:"refresh_token",refresh_token:t.rt});r=await fetch(FB_API+path,{headers:{Authorization:"Bearer "+t.at,"Accept-Language":"en_CA"}})}
- if(r.status===429)throw new Error("Fitbit rate limit – try again in an hour");if(!r.ok)throw new Error("Fitbit HTTP "+r.status);return r.json()}
-async function fbSync(k,quiet){const s=await fbGet(`/1/user/-/activities/date/${k}.json`);const S=s.summary||{};
- let azm=null;try{const a=await fbGet(`/1/user/-/activities/active-zone-minutes/date/${k}/1d.json`);const v=(a["activities-active-zone-minutes"]||[])[0];azm=v?v.value.activeZoneMinutes:0}catch(e){}
- const dist=(S.distances||[]).find(d=>d.activity==="total");
- const vals={steps:S.steps,total_kcal:S.caloriesOut,active_kcal:S.activityCalories,resting_kcal:S.caloriesBMR,distance_km:dist?Math.round(dist.distance*100)/100:null,azm,rhr:S.restingHeartRate!=null?S.restingHeartRate:null,
-  exercise_min:(S.fairlyActiveMinutes||0)+(S.veryActiveMinutes||0),
-  acts:(s.activities||[]).map(a=>({n:a.name||a.activityName,min:Math.round((a.duration||0)/60000),kcal:a.calories,st:a.startTime}))};
- Object.keys(vals).forEach(x=>vals[x]==null&&delete vals[x]);
- const H=LS.get("health",{});H[k]=Object.assign({},H[k]||{},vals,{src:"Fitbit",at:Date.now()});LS.set("health",H);if(!quiet)toast("Fitbit synced ✓ "+k);return vals}
-async function fbSyncRange(k,n,quiet){for(let i=1;i<=n;i++){const dk=dkey(addD(parseK(k),-i));try{await fbSync(dk,true)}catch(e){if(/rate/.test(e.message))break}}if(!quiet)toast("Fitbit: synced 7 days ✓")}
-function fbDisconnect(){const t=fbTok();if(t)fetch(FB_API+"/oauth2/revoke",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:fbCid(),token:t.rt||t.at})}).catch(()=>{});localStorage.removeItem("vr2_fb_tok");toast("Fitbit disconnected");route()}
-PAGES.fitbit=()=>{const t=fbTok();return `<p><a href="#today" style="color:var(--acc2)">‹ Daily report</a></p><h2>⌚ Fitbit (Charge 6)</h2>
- <div class="box"><b>Status:</b> ${t?`✅ Connected${t.uid?" (user "+esc(t.uid)+")":""}`:"Not connected"}<p class="sub">Pulls steps, total/active/BMR calories, Active Zone Minutes, resting heart rate, distance and logged exercises for any day. Tokens stay only on this phone.</p>
- <div class="row">${t?`<button class="btn" data-fb="sync">Sync today</button><button class="btn sec" data-fb="sync7">Sync last 7 days</button><button class="btn sec" data-fb="off">Disconnect</button>`:`<button class="btn" data-fb="conn">Connect Fitbit</button>`}</div></div>
- <div class="box"><b>Fitbit Client ID</b><p class="sub">From dev.fitbit.com → Manage → your app (OAuth 2.0 Client ID, 6 characters). Redirect URL must be exactly <code>${esc(fbRedirect())}</code></p>
- <div class="row"><input id="fbcid" value="${esc(fbCid())}" placeholder="e.g. 23ABCD" style="padding:8px;border-radius:8px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line)"><button class="btn sec" data-fb="savecid">Save</button></div></div>
- <div class="box sub">Sync your Charge 6 to the Fitbit phone app first, then press Sync here. No Fitbit? Use manual entry or the Apple Health Shortcut on the Daily report.</div>`};
+function fbTok(){return LS.get("gh_tok",null)}
+function rnd(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,"0")).join("")}
+function fbConnect(silent){const cid=fbCid();if(!cid){toast("Add your Google Client ID in Fitbit settings first");location.hash="#fitbit";return}
+ const st=rnd(16);localStorage.setItem("vr2_gh_state",JSON.stringify({st,ret:window._rd||TODAYK}));const t=fbTok();
+ const p={client_id:cid,redirect_uri:fbRedirect(),response_type:"token",scope:GH_SCOPES,include_granted_scopes:"true",state:st};if(t&&t.hint)p.login_hint=t.hint;
+ location.href="https://accounts.google.com/o/oauth2/v2/auth?"+new URLSearchParams(p)}
+async function fbCallback(){if(!location.hash||!/access_token=|error=/.test(location.hash))return;const q=new URLSearchParams(location.hash.slice(1));
+ const pk=JSON.parse(localStorage.getItem("vr2_gh_state")||"null");localStorage.removeItem("vr2_gh_state");try{history.replaceState(null,"",location.pathname+"#today")}catch(e){}
+ if(q.has("error")){toast("Google sign-in: "+q.get("error"));return}
+ if(!pk||pk.st!==q.get("state")){toast("Sign-in failed (state mismatch) – try again");return}
+ if(!/activity_and_fitness/.test(q.get("scope")||"")){toast("Please allow the Activity & fitness permission");return}
+ const old=fbTok()||{};LS.set("gh_tok",{at:q.get("access_token"),exp:Date.now()+(+q.get("expires_in")||3600)*1000-60000,hint:old.hint,first:old.first||Date.now()});
+ window._rd=pk.ret;toast("Fitbit connected ✓");try{await fbSync(pk.ret,true);await fbSyncRange(pk.ret,6,true);toast("Fitbit synced ✓")}catch(e){toast("Fitbit: "+e.message)}route()}
+async function ghFetch(path,opt){const t=fbTok();if(!t)throw new Error("not connected");if(Date.now()>t.exp){fbConnect(true);throw new Error("signing in again…")}
+ const r=await fetch(GH_API+path,Object.assign({},opt,{headers:{Authorization:"Bearer "+t.at,"Content-Type":"application/json"}}));
+ if(r.status===401){fbConnect(true);throw new Error("signing in again…")}if(r.status===429)throw new Error("rate limit – try later");
+ if(!r.ok){let m="";try{m=(await r.json()).error.message}catch(e){}throw new Error("HTTP "+r.status+(m?": "+m:""))}return r.json()}
+const civ=k=>{const[y,m,d]=k.split("-").map(Number);return {date:{year:y,month:m,day:d}}};
+async function roll(type,k,n){/* n days ending at k inclusive -> {dayKey: rollupDataPoint} */
+ const s=dkey(addD(parseK(k),-(n-1))),e=dkey(addD(parseK(k),1));const j=await ghFetch(type+"/dataPoints:dailyRollUp",{method:"POST",body:JSON.stringify({range:{start:civ(s),end:civ(e)}})});
+ const o={};(j.rollupDataPoints||[]).forEach(p=>{const D=p.civilStartTime.date;o[`${D.year}-${String(D.month).padStart(2,"0")}-${String(D.day).padStart(2,"0")}`]=p});return o}
+async function fbSyncN(k,n){const safe=f=>f.catch(()=>({}));
+ const [st,tc,ae,az,di]=await Promise.all([roll("steps",k,n),safe(roll("total-calories",k,n)),safe(roll("active-energy-burned",k,n)),safe(roll("active-zone-minutes",k,n)),safe(roll("distance",k,n))]);
+ const s=dkey(addD(parseK(k),-(n-1))),e=dkey(addD(parseK(k),1));
+ const rh=await safe(ghFetch(`daily-resting-heart-rate/dataPoints?filter=${encodeURIComponent(`daily_resting_heart_rate.date >= "${s}" AND daily_resting_heart_rate.date < "${e}"`)}`));
+ const ex=await safe(ghFetch(`exercise/dataPoints?pageSize=25&filter=${encodeURIComponent(`exercise.interval.civil_start_time >= "${s}" AND exercise.interval.civil_start_time < "${e}"`)}`));
+ const H=LS.get("health",{});for(let i=0;i<n;i++){const dk=dkey(addD(parseK(k),-i));const v={};
+  if(st[dk])v.steps=+st[dk].steps.countSum;if(tc[dk])v.total_kcal=Math.round(tc[dk].totalCalories.kcalSum);if(ae[dk])v.active_kcal=Math.round(ae[dk].activeEnergyBurned.kcalSum);
+  if(v.total_kcal!=null&&v.active_kcal!=null)v.resting_kcal=Math.max(0,v.total_kcal-v.active_kcal);
+  if(az[dk]){const a=az[dk].activeZoneMinutes;v.azm=(+a.sumInFatBurnHeartZone||0)+2*(+a.sumInCardioHeartZone||0)+2*(+a.sumInPeakHeartZone||0)}
+  if(di[dk])v.distance_km=Math.round(+di[dk].distance.millimetersSum/1e4)/100;
+  ((rh.dataPoints)||[]).forEach(p=>{const r=p.dailyRestingHeartRate,D=r.date;if(`${D.year}-${String(D.month).padStart(2,"0")}-${String(D.day).padStart(2,"0")}`===dk)v.rhr=+r.beatsPerMinute});
+  const acts=((ex.dataPoints)||[]).map(p=>p.exercise).filter(x=>{const D=x.interval.civilStartTime.date;return `${D.year}-${String(D.month).padStart(2,"0")}-${String(D.day).padStart(2,"0")}`===dk})
+   .map(x=>({n:x.displayName||x.exerciseType,min:Math.round(parseFloat(x.activeDuration||"0")/60)||Math.round((new Date(x.interval.endTime)-new Date(x.interval.startTime))/60000),kcal:x.metricsSummary&&x.metricsSummary.caloriesKcal}));
+  if(acts.length)v.acts=acts;if(!Object.keys(v).length)continue;
+  H[dk]=Object.assign({},H[dk]||{},v,{src:"Fitbit",at:Date.now()})}LS.set("health",H)}
+async function fbSync(k,quiet){await fbSyncN(k,1);if(!quiet)toast("Fitbit synced ✓ "+k)}
+async function fbSyncRange(k,n,quiet){await fbSyncN(dkey(addD(parseK(k),-1)),n);if(!quiet)toast("Fitbit: synced 7 days ✓")}
+function fbDisconnect(){const t=fbTok();if(t)fetch("https://oauth2.googleapis.com/revoke?token="+encodeURIComponent(t.at),{method:"POST"}).catch(()=>{});localStorage.removeItem("vr2_gh_tok");toast("Fitbit disconnected");route()}
+PAGES.fitbit=()=>{const t=fbTok(),live=t&&Date.now()<t.exp;return `<p><a href="#today" style="color:var(--acc2)">‹ Daily report</a></p><h2>⌚ Fitbit Charge 6 (Google Health)</h2>
+ <div class="box"><b>Status:</b> ${t?(live?"✅ Connected":"🟡 Connected – Google session expired, tap Sync to sign in again (one tap)"):"Not connected"}<p class="sub">Reads steps, total/active calories, Active Zone Minutes, resting heart rate, distance and recorded exercises for any day through the Google Health API (Fitbit's replacement API). The sign-in token stays on this phone and lasts 1 hour. After that, Sync opens Google sign-in again for one tap.</p>
+ <div class="row">${t?`<button class="btn" data-fb="sync">Sync today</button><button class="btn sec" data-fb="sync7">Sync last 7 days</button><button class="btn sec" data-fb="off">Disconnect</button>`:`<button class="btn" data-fb="conn">Connect Fitbit (Google sign-in)</button>`}</div></div>
+ <div class="box"><b>Google OAuth Client ID</b><p class="sub">From Google Cloud Console → Google Auth Platform → Clients (type Web application). The authorized redirect URI must be exactly <code>${esc(fbRedirect())}</code></p>
+ <div class="row"><input id="fbcid" value="${esc(fbCid())}" placeholder="1234-abc.apps.googleusercontent.com" style="width:100%;padding:8px;border-radius:8px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line)"><button class="btn sec" data-fb="savecid">Save</button></div></div>
+ <div class="box sub">First, open the Fitbit app so your Charge 6 syncs, then tap Sync here. If you don't have a connection, use manual entry or the Apple Health Shortcut on the Daily report.</div>`};
 document.addEventListener("click",async ev=>{const b=ev.target.closest("[data-fb]");if(!b)return;const a=b.dataset.fb,k=window._rd||TODAYK;
- try{if(a==="conn")await fbConnect();if(a==="off")fbDisconnect();if(a==="savecid"){LS.set("fb_cid",document.getElementById("fbcid").value.trim());toast("Client ID saved");route()}
- if(a==="sync"){b.disabled=true;await fbSync(k);route()}if(a==="sync7"){b.disabled=true;await fbSync(k,true);await fbSyncRange(k,6);route()}}catch(e){toast("Fitbit: "+e.message);b.disabled=false}});
+ try{if(a==="conn")fbConnect();if(a==="off")fbDisconnect();if(a==="savecid"){LS.set("gh_cid",document.getElementById("fbcid").value.trim());toast("Client ID saved");route()}
+ if(a==="sync"){b.disabled=true;await fbSync(k);route()}if(a==="sync7"){b.disabled=true;await fbSyncN(k,7);toast("Fitbit: synced 7 days ✓");route()}}catch(e){toast("Fitbit: "+e.message);b.disabled=false}});
 fbCallback();
 
 
